@@ -125,8 +125,7 @@ void writeSkin(Binary& binary, const Skin& skin, const SkeletonData& skeletonDat
             switch (attachment.type) {
                 case AttachmentType_Region: {
                     const RegionAttachment& region = std::get<RegionAttachment>(attachment.data);
-                    if (attachment.path != attachment.name) writeStringRef(binary, attachment.path, skeletonData);
-                    else writeStringRef(binary, std::nullopt, skeletonData);
+                    writeStringRef(binary, attachment.path, skeletonData);
                     writeFloat(binary, region.rotation);
                     writeFloat(binary, region.x);
                     writeFloat(binary, region.y);
@@ -150,8 +149,7 @@ void writeSkin(Binary& binary, const Skin& skin, const SkeletonData& skeletonDat
                 }
                 case AttachmentType_Mesh: {
                     const MeshAttachment& mesh = std::get<MeshAttachment>(attachment.data);
-                    if (attachment.path != attachment.name) writeStringRef(binary, attachment.path, skeletonData);
-                    else writeStringRef(binary, std::nullopt, skeletonData);
+                    writeStringRef(binary, attachment.path, skeletonData);
                     if (mesh.color) writeColor(binary, mesh.color.value());
                     else writeColor(binary, Color{0xff, 0xff, 0xff, 0xff});
                     int vertexCount = mesh.uvs.size() / 2;
@@ -169,8 +167,7 @@ void writeSkin(Binary& binary, const Skin& skin, const SkeletonData& skeletonDat
                 }
                 case AttachmentType_Linkedmesh: {
                     const LinkedmeshAttachment& linkedMesh = std::get<LinkedmeshAttachment>(attachment.data);
-                    if (attachment.path != attachment.name) writeStringRef(binary, attachment.path, skeletonData);
-                    else writeStringRef(binary, std::nullopt, skeletonData);
+                    writeStringRef(binary, attachment.path, skeletonData);
                     if (linkedMesh.color) writeColor(binary, linkedMesh.color.value());
                     else writeColor(binary, Color{0xff, 0xff, 0xff, 0xff});
                     writeStringRef(binary, linkedMesh.skin, skeletonData);
@@ -241,7 +238,12 @@ void writeAnimation(Binary& binary, const Animation& animation, const SkeletonDa
             }
         }
         writeVarint(binary, slotIndex, true);
-        writeVarint(binary, multiTimeline.size(), true);
+        int timelineCount = 0;
+        for (const auto& [timelineName, timeline] : multiTimeline) {
+            SlotTimelineType timelineType = slotTimelineTypeMap.at(timelineName);
+            if (timelineType != SlotTimelineType::SLOT_ALPHA) timelineCount++;
+        }
+        writeVarint(binary, timelineCount, true);
         for (const auto& [timelineName, timeline] : multiTimeline) {
             SlotTimelineType timelineType = slotTimelineTypeMap.at(timelineName);
             if (timelineType == SlotTimelineType::SLOT_ALPHA) continue;
@@ -302,7 +304,12 @@ void writeAnimation(Binary& binary, const Animation& animation, const SkeletonDa
             }
         }
         writeVarint(binary, boneIndex, true);
-        writeVarint(binary, multiTimeline.size(), true);
+        int timelineCount = 0;
+        for (const auto& [timelineName, timeline] : multiTimeline) {
+            BoneTimelineType timelineType = boneTimelineTypeMap.at(timelineName);
+            if (timelineType != BONE_INHERIT) timelineCount++;
+        }
+        writeVarint(binary, timelineCount, true);
         for (const auto& [timelineName, timeline] : multiTimeline) {
             BoneTimelineType timelineType = boneTimelineTypeMap.at(timelineName);
             if (timelineType == BONE_INHERIT) continue;
@@ -452,7 +459,11 @@ void writeAnimation(Binary& binary, const Animation& animation, const SkeletonDa
                 }
             }
             writeVarint(binary, slotIndex, true);
-            writeVarint(binary, slotMap.size(), true);
+            int deformCount = 0;
+            for (const auto& [attachmentName, multiTimeline] : slotMap) {
+                if (multiTimeline.contains("deform")) deformCount++;
+            }
+            writeVarint(binary, deformCount, true);
             for (const auto& [attachmentName, multiTimeline] : slotMap) {
                 if (!multiTimeline.contains("deform")) continue;
                 const auto& timeline = multiTimeline.at("deform");
